@@ -21,7 +21,11 @@ def get_jan(**kwargs):
     
     return arraynp.astype(np.uint8)
 
-def run_haralick(impath):
+def run_haralick(impath, class_path):
+	db = pd.read_csv(class_path)
+	db["cortes_tratados"].fillna(0, inplace=True)
+	class_dict = pd.Series(db.cortes_tratados.values, index = db["Renomeação"]).to_dict()
+
 	regex_pattern = r"^Paciente(?P<numero_paciente>\d*)\s*\((?P<slice>\d*)\).dcm"
 	count = 0
 	data = []
@@ -35,6 +39,10 @@ def run_haralick(impath):
 			match = re.match(regex_pattern,imagePath.name)
 			numero_paciente = match.group("numero_paciente")
 			slice_paciente = match.group("slice")
+			classe = 0
+			if isinstance(class_dict["Paciente"+str(numero_paciente)],list):
+				if slice_paciente in class_dict["Paciente"+str(numero_paciente)]:
+					classe = 1
 			patient = dy.dcmread(imagePath.path)
 			patient_sex = patient.PatientSex
 			patient_age = patient.PatientAge
@@ -51,7 +59,7 @@ def run_haralick(impath):
 			if count == 3:
 				vc = hist.transpose()
 				histd = np.hstack((va, vb, vc)) #hstack put the var,varb,varc in the same line
-				dataframepandas = np.hstack((numero_paciente,slice_paciente,patient_sex,patient_age, va, vb, vc))#hstack put the rotulostemp, zclass var,varb,varc in the same line
+				dataframepandas = np.hstack((numero_paciente,slice_paciente,classe,patient_sex,patient_age, va, vb, vc))#hstack put the rotulostemp, zclass var,varb,varc in the same line
 				list_number.append(numero_paciente)
 				data.append(dataframepandas) #put the dataframepandas variable into dados  #mudar para o numpy array
 				count = 0
@@ -69,8 +77,8 @@ def put_class(my_list,path_plan):
 	count = 0
 	count2 = 0
 	class_list = []
-	list_class = db_plan.iloc[:,9].to_list()
-	list_name = db_plan.iloc[:,1].to_list()
+	list_class = db_plan["AVCi"].to_list()
+	list_name = db_plan["Renomeação"].to_list()
 	for i in my_list:
 		for j in list_name:
 			matche = re.match(regex_pattern,j)
@@ -90,13 +98,12 @@ def put_class(my_list,path_plan):
 	return class_list
 
 
-def create_csv(dataframe,ncolumns,class_list):
+def create_csv(dataframe,ncolumns):
 	df = pd.DataFrame(dataframe,columns=ncolumns) #create the pandas dataframe
-	df["classe"] = class_list
 	df.to_csv('results_haralick_tomo.csv') #create the csv file from pandas dataframe
 
 def define_columns(tam):
-	nomes_col = ["numero_paciente","slice_paciente","patient_sex","patient_age"] #create the column segment for the pandas dataframe
+	nomes_col = ["numero_paciente","slice_paciente","class","patient_sex","patient_age"] #create the column segment for the pandas dataframe
 	count3 = 0
 	while count3 < (tam): #count the vara and create the columns
 		name = "x_"+str(count3)
@@ -117,10 +124,10 @@ def define_columns(tam):
 
 def main():
 	path = "/home/gpds/Documentos/imagens-médicas/projeto_cecilia/avc-pacientes-renomeados"
-	path_plan = "/home/gpds/Documentos/imagens-médicas/projeto_cecilia/Planilha_de_controle AVC 15_12_14.csv"
-	data,list_number,tam = run_haralick(path)
-	class_list = put_class(list_number,path_plan)
+	path_plan = "avc_controle_filtrado.csv"
+	data,list_number,tam = run_haralick(path, path_plan)
+	#class_list = put_class(list_number,path_plan)
 	nomes_col = define_columns(tam)
-	create_csv(data,nomes_col,class_list)
+	create_csv(data,nomes_col)
 
 main()
