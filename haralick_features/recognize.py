@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import cv2
+from ast import literal_eval
 from imutils import paths
 import mahotas as mt
 import os
@@ -25,13 +25,15 @@ def run_haralick(impath, class_path):
 	db = pd.read_csv(class_path)
 	db["cortes_tratados"].fillna(0, inplace=True)
 	class_dict = pd.Series(db.cortes_tratados.values, index = db["Renomeação"]).to_dict()
-
+	for index in class_dict:
+		try:
+			class_dict[index] = literal_eval(class_dict[index])
+		except:
+			pass
 	regex_pattern = r"^Paciente(?P<numero_paciente>\d*)\s*\((?P<slice>\d*)\).dcm"
-	count = 0
 	data = []
 	j = 0
 	contador = 0
-	list_test = []
 	list_number = []
 	all_directory_paths = os.scandir(impath)
 	for directory in all_directory_paths:
@@ -40,10 +42,17 @@ def run_haralick(impath, class_path):
 			numero_paciente = match.group("numero_paciente")
 			slice_paciente = match.group("slice")
 			classe = 0
-			if isinstance(class_dict["Paciente"+str(numero_paciente)],list):
-				if slice_paciente in class_dict["Paciente"+str(numero_paciente)]:
-					classe = 1
-			patient = dy.dcmread(imagePath.path)
+			try:
+				if isinstance(class_dict["Paciente"+str(numero_paciente)],list):
+					if int(slice_paciente) in class_dict["Paciente"+str(numero_paciente)]:
+						classe = 1
+			except:
+				classe = 3
+			try:
+				patient = dy.dcmread(imagePath.path)
+			except:
+				print(f'Erro na imagem {imagePath.path}')
+				continue
 			patient_sex = patient.PatientSex
 			patient_age = patient.PatientAge
 			janelamento = np.arange(10,120)
@@ -51,22 +60,14 @@ def run_haralick(impath, class_path):
 			#gray = cv2.cvtColor(img_jan, cv2.COLOR_BGR2GRAY) #change the color of the image to gray
 			histt = mt.features.haralick(img_jan,return_mean_ptp = True)
 			hist = np.ravel(histt)
-			count = 1+count
-			if count == 1:
-				va = hist.transpose()
-			if count == 2:
-				vb = hist.transpose()
-			if count == 3:
-				vc = hist.transpose()
-				histd = np.hstack((va, vb, vc)) #hstack put the var,varb,varc in the same line
-				dataframepandas = np.hstack((numero_paciente,slice_paciente,classe,patient_sex,patient_age, va, vb, vc))#hstack put the rotulostemp, zclass var,varb,varc in the same line
-				list_number.append(numero_paciente)
-				data.append(dataframepandas) #put the dataframepandas variable into dados  #mudar para o numpy array
-				count = 0
-				j = j + 1
+			va = hist.transpose()
+			dataframepandas = np.hstack(("Paciente"+numero_paciente,slice_paciente,classe,patient_sex,patient_age, va))#hstack put the rotulostemp, zclass var,varb,varc in the same line
+			list_number.append(numero_paciente)
+			data.append(dataframepandas) #put the dataframepandas variable into dados  #mudar para o numpy array
+			j = j + 1
 			tam = va.size
 		contador+=1
-		print(f"{contador*50} Pacientes concluidos de 300")
+		print(f"{contador*50} Pacientes concluidos de {db.shape[0]}")
 		
 	return data,list_number,tam
 
@@ -81,7 +82,7 @@ def put_class(my_list,path_plan):
 	list_name = db_plan["Renomeação"].to_list()
 	for i in my_list:
 		for j in list_name:
-			matche = re.match(regex_pattern,j)
+			matche = re.match(regex_pattern,int(j))
 			try:
 				numero = matche.group("numero")
 			except:
@@ -100,6 +101,7 @@ def put_class(my_list,path_plan):
 
 def create_csv(dataframe,ncolumns):
 	df = pd.DataFrame(dataframe,columns=ncolumns) #create the pandas dataframe
+	df.sort_values(by = ["numero_paciente","slice_paciente"], inplace=True)
 	df.to_csv('results_haralick_tomo.csv') #create the csv file from pandas dataframe
 
 def define_columns(tam):
@@ -110,15 +112,6 @@ def define_columns(tam):
 		count3 = count3+1
 		nomes_col.append(name)
 	count3 = 0
-	while count3 < (tam): #count the varb and create the columns
-		name = "y_"+str(count3)
-		count3 = count3+1
-		nomes_col.append(name)
-	count3 = 0
-	while count3 < (tam): #count the varc and create the columns
-		name = "z_"+str(count3)
-		count3 = count3+1
-		nomes_col.append(name)
 	return nomes_col
 
 
