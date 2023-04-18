@@ -1,33 +1,30 @@
 from libimports import *
 
-INPUT_SIZE = 17
+INPUT_SIZE = 27
 
 def iniciate_input_size(number):
     INPUT_SIZE = number
 
 def split_pipeline(dataframe, split_size = 0.3, categories_qtd = 2, normalize = True, TARGET = 'classe'):
-    
+    SEED = 1234
     temp_df = dataframe.copy()
-    val_df = dataframe[0]
-    test_df = dataframe[1]
-    train_df = dataframe[2]
-    train_labels = np.array(train_df.pop(TARGET))
-    val_labels = np.array(val_df.pop(TARGET))
-    test_labels = np.array(test_df.pop(TARGET))
-
-    train_labels = tf.keras.utils.to_categorical(train_labels, categories_qtd)
-    val_labels = tf.keras.utils.to_categorical(val_labels, categories_qtd)
-    test_labels = tf.keras.utils.to_categorical(test_labels, categories_qtd)
-
     if normalize :
         scaler = StandardScaler()
-        print(train_df)
-        train_df = scaler.fit_transform(train_df)
-        val_df = scaler.fit_transform(val_df)
-        test_df = scaler.fit_transform(test_df)
+        normalized_df = scaler.fit_transform(temp_df)
+    y_values = temp_df[["class"]]
+    x_values = temp_df.drop(columns = ["class"])
+    X_train, X_test, Y_train, Y_test = train_test_split(x_values,y_values,test_size=split_size, random_state=SEED) # testar com o stratify depois
+    # train_labels = np.array(train_df.pop(TARGET))
+    # val_labels = np.array(val_df.pop(TARGET))
+    # test_labels = np.array(test_df.pop(TARGET))
+
+    # train_labels = tf.keras.utils.to_categorical(train_labels, categories_qtd)
+    # val_labels = tf.keras.utils.to_categorical(val_labels, categories_qtd)
+    # test_labels = tf.keras.utils.to_categorical(test_labels, categories_qtd)
 
 
-    return train_df, train_labels, test_df, test_labels, val_df, val_labels
+
+    return X_train, X_test, Y_train, Y_test
 
 def make_model(units, activation, dropout, lr, input_size = INPUT_SIZE):
     METRICS = [
